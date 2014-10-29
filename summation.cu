@@ -32,47 +32,35 @@ float log2_series(int n)
 int main(int argc, char ** argv)
 {
     
-    if(argc < 2){                
-        printf("\nYou need to specify which kernel you want to run...\n");
+    if(argc < 4){                
+        printf("\nYou must specify: kernel_id,  number of blocks, and number of threads per block.\n");
         return 1;
     }
     
     int data_size = 1024 * 1024 * 128;
 
-
-
-
-
     
     // Run CPU version
-
-    
-    clock_t start_cpu = clock();
-    
-    float log2 = log2_series(data_size);            
-    
-    
-    clock_t end_cpu = clock();
-    
+    clock_t start_cpu = clock();    
+    float log2 = log2_series(data_size);                    
+    clock_t end_cpu = clock();    
     float seconds = (float)(end_cpu - start_cpu) / CLOCKS_PER_SEC;    
-    
-    
-
-    // Perform time-consuming operation
-    
     printf("\nlog(2)    = %20.20f", log(2.0));    
     printf("\nCPU RESULT: %20.20f\n", log2);        
     printf(" Total time :%fs\n", seconds);
+
+
+
     
     // Parameter definition (original from example...)
-    int threads_per_block = 4 * 32;
     int blocks_in_grid = 8;    
+    int threads_per_block = 4 * 32;
 
     // Modified parameters for testing purposes...
     // Some ideias about how to setup the block an thread number
     // http://stackoverflow.com/questions/4861244/how-many-threads-does-nvidia-gts-450-has
-    threads_per_block = 64;
-    blocks_in_grid = 512;    
+    blocks_in_grid = atoi(argv[2]);
+    threads_per_block = atoi(argv[3]);
 
     
     int num_threads = threads_per_block * blocks_in_grid;
