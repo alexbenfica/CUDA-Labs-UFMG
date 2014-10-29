@@ -30,6 +30,12 @@ float log2_series(int n)
 
 int main(int argc, char ** argv)
 {
+    
+    if(argc < 2){                
+        printf("\nYou need to specify which kernel you want to run...\n");
+        return 1;
+    }
+    
     int data_size = 1024 * 1024 * 128;
 
     // Run CPU version
@@ -39,9 +45,9 @@ int main(int argc, char ** argv)
     double end_time = 1;
     //double end_time = getclock();
     
-    printf("CPU result: %f\n", log2);
-    printf(" log(2)=%f\n", log(2.0));
-    printf(" time=%fs\n", end_time - start_time);
+    printf("\nCPU RESULT: %f\n", log2);
+    printf(" log(2): %20.20f\n", log(2.0));
+    printf(" Total time :%fs\n", end_time - start_time);
 
     
     // Parameter definition (original from example...)
@@ -82,9 +88,17 @@ int main(int argc, char ** argv)
 
     
     
-    // Execute kernel
-    summation_kernel<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
+    // Executes kernel, depending on input parameters...        
+    int kernel_id = atoi(argv[1]);        
     
+    switch(kernel_id){
+        case 0:
+            summation_kernel_0<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
+            break;
+        case 1:
+            summation_kernel_1<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
+            break;
+    }
     
     
     // Stop timer
@@ -118,12 +132,12 @@ int main(int argc, char ** argv)
     
     // Show timming statistics
     
-    printf("GPU results:\n");
+    printf("\nGPU RESULT:\n");
+    printf(" Sum: %20.20f\n", sum);
+    printf(" Kernel ID: %d\n", kernel_id);
     printf(" Blocks: %d\n", blocks_in_grid);
     printf(" Thread per block: %d\n", threads_per_block);
-    printf(" Total threas: %d\n", threads_per_block * blocks_in_grid);
-    printf(" Sum: %20.20f\n", sum);
-    
+    printf(" Total threads: %d\n", threads_per_block * blocks_in_grid);
     
     float elapsedTime;
     // In ms

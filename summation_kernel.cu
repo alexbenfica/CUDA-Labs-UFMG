@@ -31,7 +31,7 @@ Follow us: @GPUComputing on Twitter | NVIDIA on Facebook
 
 // GPU kernel 
 // Each thread receives a contiguous block of data
-__global__ void summation_kernel(int data_size, results* data_out)
+__global__ void summation_kernel_0(int data_size, results* data_out)
 {   
     
     int tot_thr = gridDim.x * blockDim.x;
@@ -62,19 +62,26 @@ __global__ void summation_kernel(int data_size, results* data_out)
 // GPU kernel 2 (sliced)
 __global__ void summation_kernel_1(int data_size, results* data_out)
 {    
-    float result = 0.;    
-    int i;
+    int tot_thr = gridDim.x * blockDim.x;
+    int thr_data_size = data_size / tot_thr;
+    int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int tot_thr = gridDim.x * blockDim.x;    
-    int dt_sz_thr = data_size / tot_thr;
-    
-    int thr_id = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    for(int j = 0; j < tot_thr; j++){
-        i = j * dt_sz_thr + thr_id;
-        result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
+    /*
+    if(threadIdx.x >= 0){
+        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
     }
-    data_out[thr_id].sum = result;    
+    */
+    
+    int i;
+    float result = 0.0;        
+    for(int j = 0; j < thr_data_size; j++){
+        i = thr_id_abs + j * thr_data_size;
+        if(i < data_size){
+            result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
+        }
+    }
+    data_out[thr_id_abs].sum = (float) result;
+    
 }
 
 
