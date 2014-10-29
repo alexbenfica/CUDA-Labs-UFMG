@@ -29,17 +29,30 @@ Follow us: @GPUComputing on Twitter | NVIDIA on Facebook
  */
 
 
-// GPU kernel blocks of data
+// GPU kernel 
+// Each thread receives a contiguous block of data
 __global__ void summation_kernel(int data_size, results* data_out)
-{    
+{   
     
-    float result = 0.;    
-    int offset = threadIdx.x * data_size;
+    int tot_thr = gridDim.x * blockDim.x;
+    int thr_data_size = data_size / tot_thr;
+    int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
+    int thr_offset = thr_id_abs * thr_data_size;
     
-    for(int i = offset; i < offset + data_size; i++){
+    /*
+    if(threadIdx.x >= 0){
+        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
+    }
+    */
+    
+    
+    int i;
+    float result = 0.0;        
+    for(int j = 0; j < thr_data_size; j++){
+        i = thr_offset + j;
         result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
     }
-    data_out[threadIdx.x].sum = result;
+    data_out[thr_id_abs].sum = (float) result;
     
 }
 

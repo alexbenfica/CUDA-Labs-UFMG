@@ -44,10 +44,19 @@ int main(int argc, char ** argv)
     printf(" time=%fs\n", end_time - start_time);
 
     
-    // Parameter definition
+    // Parameter definition (original from example...)
     int threads_per_block = 4 * 32;
     int blocks_in_grid = 8;    
+
+    // Modified parameters for testing purposes...
+    // Some ideias about how to setup the block an thread number
+    // http://stackoverflow.com/questions/4861244/how-many-threads-does-nvidia-gts-450-has
+    threads_per_block = 512;
+    blocks_in_grid = 64;    
+
+    
     int num_threads = threads_per_block * blocks_in_grid;
+    
 
     // Timer initialization and configuration
     cudaEvent_t start, stop;
@@ -66,7 +75,7 @@ int main(int argc, char ** argv)
     data_out_cpu = (results *) malloc(sizeof(results) * results_size);
 
     // Allocating output data on GPU    
-    printf("%d", cudaMalloc((void**)&data_out_gpu, sizeof(results) * results_size));
+    cudaMalloc((void**)&data_out_gpu, sizeof(results) * results_size);
 
     // Start timer
     CUDA_SAFE_CALL(cudaEventRecord(start, 0));
@@ -74,7 +83,7 @@ int main(int argc, char ** argv)
     
     
     // Execute kernel
-    summation_kernel<<<1, num_threads>>>(data_size / num_threads, data_out_gpu);
+    summation_kernel<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
     
     
     
@@ -88,9 +97,17 @@ int main(int argc, char ** argv)
     // Finish reduction on CPU, adding all elements
     int i;
     float sum = 0.;
+    printf("\n");
     for(i=0; i<num_threads; i++){
         sum += data_out_cpu[i].sum;        
+        #if 0
+        if((i>0)&&(i<40)){
+            printf("Thread %d result: %20.20f\n" , i, data_out_cpu[i].sum);
+        }
+        #endif  
     }
+    
+    
     
     
     // Cleanup CPU and GPU memory.
@@ -102,7 +119,10 @@ int main(int argc, char ** argv)
     // Show timming statistics
     
     printf("GPU results:\n");
-    printf(" Sum: %f\n", sum);
+    printf(" Blocks: %d\n", blocks_in_grid);
+    printf(" Thread per block: %d\n", threads_per_block);
+    printf(" Total threas: %d\n", threads_per_block * blocks_in_grid);
+    printf(" Sum: %20.20f\n", sum);
     
     
     float elapsedTime;
