@@ -62,23 +62,17 @@ __global__ void summation_kernel_0(int data_size, results* data_out)
 // GPU kernel 2 (sliced)
 __global__ void summation_kernel_1(int data_size, results* data_out)
 {    
-    int tot_thr = gridDim.x * blockDim.x;
-    int thr_data_size = data_size / tot_thr;
+     int tot_thr = gridDim.x * blockDim.x;
+    int thr_data_div = data_size / tot_thr;
     int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    /*
-    if(threadIdx.x >= 0){
-        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
-    }
-    */
+
     
     int i;
     float result = 0.0;        
-    for(int j = 0; j < thr_data_size; j++){
-        i = thr_id_abs + j * thr_data_size;
-        if(i < data_size){
-            result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
-        }
+    for(int j = 0; j < thr_data_div; j++){        
+        i = j * tot_thr + thr_id_abs;
+                
+        result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
     }
     data_out[thr_id_abs].sum = (float) result;
     

@@ -71,7 +71,7 @@ int main(int argc, char ** argv)
     CUDA_SAFE_CALL(cudaEventCreate(&start));
     CUDA_SAFE_CALL(cudaEventCreate(&stop));
 
-    // Each thread will returno only one element.
+    // Each thread will return only one element as a result.
     int results_size = num_threads;
     
     // data_out_cpu is a pointer of type results
