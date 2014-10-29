@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <stdlib.h>
+#include <time.h>
 
 struct results
 {
@@ -38,17 +39,30 @@ int main(int argc, char ** argv)
     
     int data_size = 1024 * 1024 * 128;
 
-    // Run CPU version
-    double start_time = 0;
-    //double start_time = getclock();
-    float log2 = log2_series(data_size);
-    double end_time = 1;
-    //double end_time = getclock();
-    
-    printf("\nCPU RESULT: %f\n", log2);
-    printf(" log(2): %20.20f\n", log(2.0));
-    printf(" Total time :%fs\n", end_time - start_time);
 
+
+
+
+    
+    // Run CPU version
+
+    
+    clock_t start_cpu = clock();
+    
+    float log2 = log2_series(data_size);            
+    
+    
+    clock_t end_cpu = clock();
+    
+    float seconds = (float)(end_cpu - start_cpu) / CLOCKS_PER_SEC;    
+    
+    
+
+    // Perform time-consuming operation
+    
+    printf("\nlog(2)    = %20.20f", log(2.0));    
+    printf("\nCPU RESULT: %20.20f\n", log2);        
+    printf(" Total time :%fs\n", seconds);
     
     // Parameter definition (original from example...)
     int threads_per_block = 4 * 32;
@@ -57,8 +71,8 @@ int main(int argc, char ** argv)
     // Modified parameters for testing purposes...
     // Some ideias about how to setup the block an thread number
     // http://stackoverflow.com/questions/4861244/how-many-threads-does-nvidia-gts-450-has
-    threads_per_block = 512;
-    blocks_in_grid = 64;    
+    threads_per_block = 64;
+    blocks_in_grid = 512;    
 
     
     int num_threads = threads_per_block * blocks_in_grid;
@@ -132,8 +146,9 @@ int main(int argc, char ** argv)
     
     // Show timming statistics
     
-    printf("\nGPU RESULT:\n");
-    printf(" Sum: %20.20f\n", sum);
+    printf("\nlog(2)   = %20.20f", log(2.0));
+    
+    printf("\nGPU RESULT:%20.20f\n", sum);
     printf(" Kernel ID: %d\n", kernel_id);
     printf(" Blocks: %d\n", blocks_in_grid);
     printf(" Thread per block: %d\n", threads_per_block);
@@ -149,11 +164,13 @@ int main(int argc, char ** argv)
     double time_per_iter = total_time / (double)data_size;
     double bandwidth = sizeof(float) / time_per_iter; // B/s
     
-    printf(" Total time: %g s,\n Per iteration: %g ns\n Throughput: %g GB/s\n",
-    	total_time,
+    printf(" Per iteration: %g ns\n Throughput: %g GB/s\n Total time: %gs\n",    	
     	time_per_iter * 1.e9,
-    	bandwidth / 1.e9);
+    	bandwidth / 1.e9,
+        total_time);
   
+    printf("\n Speedup CPU to GPU: %5.2fx" , ((double)seconds / total_time));
+    
     return 0;
 }
 
