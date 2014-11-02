@@ -60,7 +60,7 @@ __global__ void summation_kernel_0(int data_size, results* data_out)
 
 
 // GPU kernel 2 (sliced)
-__global__ void summation_kernel_1(int data_size, results* data_out)
+__global__ void summation_kernel_interleaved(int data_size, results* data_out)
 {    
      int tot_thr = gridDim.x * blockDim.x;
     int thr_data_div = data_size / tot_thr;
@@ -109,7 +109,7 @@ __global__ void summation_kernel_value_per_block(int data_size, results* data_ou
     
     __syncthreads();    
     
-    // Use the thread 0 to sum the results of each thread in a block.    
+    // Use the thread 0 to sum the reasults of each thread in a block.    
     if(threadIdx.x == 0){
         float sum_block = 0.0;
         for(i=0;i<blockDim.x;i++){
@@ -120,5 +120,10 @@ __global__ void summation_kernel_value_per_block(int data_size, results* data_ou
     
     
 }
+
+
+
+
+
 
 
