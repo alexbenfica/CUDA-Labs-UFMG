@@ -37,6 +37,10 @@ int main(int argc, char ** argv)
         return 1;
     }
     
+    // Executes kernel, depending on input parameters...        
+    int kernel_id = atoi(argv[1]);        
+    
+    
     int data_size = 1024 * 1024 * 128;
 
     
@@ -49,9 +53,6 @@ int main(int argc, char ** argv)
     printf("\nCPU RESULT: %20.20f\n", log2);        
     printf(" Total time :%fs\n", seconds);
 
-
-
-    
     // Parameter definition (original from example...)
     int blocks_in_grid = 8;    
     int threads_per_block = 4 * 32;
@@ -71,8 +72,22 @@ int main(int argc, char ** argv)
     CUDA_SAFE_CALL(cudaEventCreate(&start));
     CUDA_SAFE_CALL(cudaEventCreate(&stop));
 
-    // Each thread will return only one element as a result.
-    int results_size = num_threads;
+    
+    int results_size;
+    
+    switch(kernel_id){
+        case 0:            
+        case 1:
+            // Each thread will return only one element as a result.
+            results_size = num_threads;            
+        break;
+        
+        case 2:
+            // Only one element will be returned per block
+            results_size = blocks_in_grid;            
+        break;           
+    }
+
     
     // data_out_cpu is a pointer of type results
     results* data_out_cpu;
@@ -89,10 +104,6 @@ int main(int argc, char ** argv)
     CUDA_SAFE_CALL(cudaEventRecord(start, 0));
 
     
-    
-    // Executes kernel, depending on input parameters...        
-    int kernel_id = atoi(argv[1]);        
-    
     switch(kernel_id){
         case 0:
             summation_kernel_0<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
@@ -100,6 +111,10 @@ int main(int argc, char ** argv)
         case 1:
             summation_kernel_1<<<blocks_in_grid, threads_per_block>>>(data_size, data_out_gpu);
             break;
+        case 2:            
+            summation_kernel_value_per_block<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(data_size, data_out_gpu);
+            break;
+            
     }
     
     
@@ -110,19 +125,27 @@ int main(int argc, char ** argv)
     // Get results back from GPU to CPU memory
     cudaMemcpy(data_out_cpu, data_out_gpu, sizeof(results) * results_size, cudaMemcpyDeviceToHost);
     
-    // Finish reduction on CPU, adding all elements
-    int i;
-    float sum = 0.;
-    printf("\n");
-    for(i=0; i<num_threads; i++){
-        sum += data_out_cpu[i].sum;        
-        #if 0
-        if((i>0)&&(i<40)){
-            printf("Thread %d result: %20.20f\n" , i, data_out_cpu[i].sum);
-        }
-        #endif  
-    }
     
+    int i;
+    float sum = 0.;    
+    switch(kernel_id){
+        // Finish reduction on CPU, adding all elements
+        case 0:
+        case 1:
+        case 2:            
+            printf("\n");
+            for(i=0; i<results_size; i++){
+                sum += data_out_cpu[i].sum;        
+                #if 0
+                if((i>0)&&(i<40)){
+                    printf("Thread %d result: %20.20f\n" , i, data_out_cpu[i].sum);
+                }
+                #endif  
+            }
+            break;
+    }
+            
+        
     
     
     
