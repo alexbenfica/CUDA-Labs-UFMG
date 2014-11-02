@@ -2,6 +2,21 @@
 #include <stdio.h>
 
 
+enum sums { 
+    SUM, 
+    SUM_INTERLEAVED, 
+    SUM_BLOCK, 
+    SUM_GPU_ONLY 
+};
+
+
+struct results{
+    float sum;
+};
+
+
+
+
 
 // Depuis le SDK Cuda
 #  define CUDA_SAFE_CALL_NO_SYNC( call) do {                                 \
