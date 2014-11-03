@@ -122,7 +122,7 @@ int main(int argc, char ** argv)
             summation_kernel_value_per_block<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(data_size, data_out_gpu);
             break;
         case SUM_GPU_ONLY:            
-            summation_kernel_gpu_only<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(data_size, data_out_gpu);
+            summation_kernel_value_per_block<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(data_size, data_out_gpu);
             reduce<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(blocks_in_grid, data_out_gpu, data_out_reduce);
             break;                        
     }

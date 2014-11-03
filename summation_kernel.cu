@@ -112,42 +112,6 @@ __global__ void summation_kernel_value_per_block(int data_size, results* data_ou
 
 
 
-__global__ void summation_kernel_gpu_only(int data_size, results* data_out)
-{    
-
-    // http://devblogs.nvidia.com/parallelforall/using-shared-memory-cuda-cc/
-    extern __shared__ float sum_threads[];
-
-    int tot_thr = gridDim.x * blockDim.x;
-    int thr_data_size = data_size / tot_thr;
-    int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
-    int thr_offset = thr_id_abs * thr_data_size;    
-    int i;
-    float result = 0.0;        
-    for(int j = 0; j < thr_data_size; j++){
-        i = thr_offset + j;
-        result +=  (float)(((((i%2)-1)+(i%2)))*-1.) / (float)(i+1);
-    }
-    sum_threads[threadIdx.x] = result;
-    
-    __syncthreads();    
-    
-    // Use the thread 0 to sum the reasults of each thread in a block.    
-    if(threadIdx.x == 0){
-        float sum_block = 0.0;
-        for(i=0;i<blockDim.x;i++){
-            sum_block += sum_threads[i];
-        }
-        data_out[blockIdx.x].sum = sum_block;    
-    }    
-}
-
-
-
-
-
-
-
 
 
 
