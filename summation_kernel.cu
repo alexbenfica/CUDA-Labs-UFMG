@@ -39,13 +39,6 @@ __global__ void summation_kernel_0(int data_size, results* data_out)
     int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
     int thr_offset = thr_id_abs * thr_data_size;
     
-    /*
-    if(threadIdx.x >= 0){
-        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
-    }
-    */
-    
-    
     int i;
     float result = 0.0;        
     for(int j = 0; j < thr_data_size; j++){
@@ -91,14 +84,7 @@ __global__ void summation_kernel_value_per_block(int data_size, results* data_ou
     int tot_thr = gridDim.x * blockDim.x;
     int thr_data_size = data_size / tot_thr;
     int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
-    int thr_offset = thr_id_abs * thr_data_size;
-    
-    /*
-    if(threadIdx.x >= 0){
-        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
-    }
-    */    
-    
+    int thr_offset = thr_id_abs * thr_data_size;    
     int i;
     float result = 0.0;        
     for(int j = 0; j < thr_data_size; j++){
@@ -135,14 +121,7 @@ __global__ void summation_kernel_gpu_only(int data_size, results* data_out)
     int tot_thr = gridDim.x * blockDim.x;
     int thr_data_size = data_size / tot_thr;
     int thr_id_abs = blockIdx.x * blockDim.x + threadIdx.x;
-    int thr_offset = thr_id_abs * thr_data_size;
-    
-    /*
-    if(threadIdx.x >= 0){
-        data_out[blockIdx.x * blockDim.x + threadIdx.x].sum = (float)blockIdx.x;        
-    }
-    */    
-    
+    int thr_offset = thr_id_abs * thr_data_size;    
     int i;
     float result = 0.0;        
     for(int j = 0; j < thr_data_size; j++){
@@ -161,18 +140,34 @@ __global__ void summation_kernel_gpu_only(int data_size, results* data_out)
         }
         data_out[blockIdx.x].sum = sum_block;    
     }    
-    __syncthreads();    
-
-    if(blockIdx.x == 0){
-        if(threadIdx.x == 0){        
-            float sum_total = 0.0;
-            for(i=0;i<gridDim.x;i++){
-                sum_total += data_out[i].sum;
-            }
-            data_out[0].sum = sum_total;    
-        }
-    }
 }
 
 
 
+
+
+
+
+
+
+
+__global__ void reduce(int n, results* g_idata, results* g_odata){    
+
+    // http://devblogs.nvidia.com/parallelforall/using-shared-memory-cuda-cc/
+    extern __shared__ float sdata[];
+
+    unsigned int tid = threadIdx.x;
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    // Load from global to shared mem
+    sdata[tid] = (i < n) ? g_idata[i].sum : 0;
+    __syncthreads();
+    for(unsigned int s = 1; s < blockDim.x; s *= 2) {
+        int index = 2 * s * tid;
+        if(index < blockDim.x) {
+            sdata[index] += sdata[index + s];
+        }
+        __syncthreads();
+    }
+    // Write result for this block to global mem
+    if (tid == 0) g_odata[blockIdx.x].sum = sdata[0];
+}

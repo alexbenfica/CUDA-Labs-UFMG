@@ -91,6 +91,7 @@ int main(int argc, char ** argv)
     // data_out_cpu is a pointer of type results
     results* data_out_cpu;
     results* data_out_gpu;
+    results* data_out_reduce;
     
     // Allocating output data on CPU
     // Cast necessary to ensure corret type on data_out_cpu
@@ -99,6 +100,13 @@ int main(int argc, char ** argv)
     // Allocating output data on GPU    
     cudaMalloc((void**)&data_out_gpu, sizeof(results) * results_size);
 
+    
+    if(kernel_id == SUM_GPU_ONLY){        
+        // Allocating output data for reduce on GPU    
+        cudaMalloc((void**)&data_out_reduce, sizeof(results) * results_size);        
+    }
+    
+    
     // Start timer
     CUDA_SAFE_CALL(cudaEventRecord(start, 0));
 
@@ -115,6 +123,7 @@ int main(int argc, char ** argv)
             break;
         case SUM_GPU_ONLY:            
             summation_kernel_gpu_only<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(data_size, data_out_gpu);
+            reduce<<<blocks_in_grid, threads_per_block, threads_per_block*sizeof(float)>>>(blocks_in_grid, data_out_gpu, data_out_reduce);
             break;                        
     }
     
@@ -132,7 +141,7 @@ int main(int argc, char ** argv)
             break;
         case SUM_GPU_ONLY:
             // Copy only one element back from GPU to CPU
-            cudaMemcpy(data_out_cpu, data_out_gpu, sizeof(results) * 1, cudaMemcpyDeviceToHost);
+            cudaMemcpy(data_out_cpu, data_out_reduce, sizeof(results) * 1, cudaMemcpyDeviceToHost);
             break;            
     }
 
