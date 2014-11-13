@@ -177,32 +177,32 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
     // Each thread copies one or two values form global to shared memory.
     // First blockDim.x bytes has the values from line before.
     // Last blockDim.x bytes has the values from line after.
-    isha = threadIdx.x + (threadIdx.y + 1) * blockIdx.x;
+    isha = threadIdx.x + (threadIdx.y + 1) * blockDim.x;
+    
     ty = blockIdx.y * blockDim.y + threadIdx.y;
     sha[isha] = read_cell(source_domain, threadIdx.x, ty, 0, 0, domain_x, domain_y, pitch);            
+
     
     // copies the first line
     if(!threadIdx.y){        
-        ty = ty + domain_y - 1;
-        ty %= domain_y;
+        ty = blockIdx.y * blockDim.y + threadIdx.y + domain_y - 1;        
+        //ty %= domain_y;
         //printf("\n%d", ty);
         sha[threadIdx.x] = read_cell(source_domain, threadIdx.x, ty, 0, 0, domain_x, domain_y, pitch);            
     }
 
     // copies the last line
     if(threadIdx.y == blockDim.y-1){        
-        ty += 1;
+        ty = blockIdx.y * blockDim.y + threadIdx.y + domain_y + 1;        
         sha[isha + blockDim.x] = read_cell(source_domain, threadIdx.x, ty, 0, 0, domain_x, domain_y, pitch);            
     }
-    
-
     __syncthreads();        
     
     
     
             
             
-    
+    // Debug copy from global to shared ...
     if(blockIdx.y==0){    
         if(threadIdx.x==0){    
             if(threadIdx.y==0){    
@@ -235,7 +235,7 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
     //write_cell(dest_domain, threadIdx.x, ty, 0 , 0 , domain_x, domain_y, pitch, sha[isha]);                        
     
     
-    __syncthreads();        
+
     
 
 
@@ -249,18 +249,37 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
     for(int x = -1; x < 2; x++){        
         for(int y = -1; y < 2; y++){            
             
-            int sx = (threadIdx.x + blockDim.x + x) % blockDim.x;
-            int sy = (threadIdx.y + y + 1);
+            int sx = threadIdx.x;
+            sx += blockDim.x;
+            sx += x;
+            sx %= blockDim.x;
+            
+            int sy = threadIdx.y + 1;            
+            sy += y;
             
             int sindex = sx + sy * blockDim.x;
+
+            neig_value = sha[sindex];            
+            
+            // Debug copy from global to shared ...
+            if(blockIdx.y==0){    
+                if(threadIdx.x==2){    
+                    if(threadIdx.y==0){    
+                        printf("\nx=%d \ny=%d \nsx=%d \nsy=%d \nsindex=%d \nblockDim.x=%d \nblockDim.y=%d \nneig_value=%d\n" , x, y, sx, sy, sindex, blockDim.x, blockDim.y, neig_value);
+                    }
+                }
+            }
+
+            
+            
             
             // The central element is the cell itself
             if((x==0) && (y==0)){
-                myself = sha[sindex];
+                myself = neig_value;
                 continue;            
             }            
             
-            neig_value = sha[sindex];            
+            
             
             if(neig_value == 1) nr++;
             if(neig_value == 2) nb++;
@@ -275,8 +294,8 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
     
     int color = calc_color(myself, nb, nr, na);
     
-    tx = threadIdx.x;
-    ty = blockIdx.y * blockDim.y + threadIdx.y;    
+    tx = threadIdx.x;    
+    ty = blockIdx.y * blockDim.y + threadIdx.y + domain_y;        
     
     //color = sindex;
     
