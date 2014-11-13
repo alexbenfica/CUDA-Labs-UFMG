@@ -60,7 +60,7 @@ int life0(){
     
     float elapsedTime;
     CUDA_SAFE_CALL(cudaEventElapsedTime(&elapsedTime, start, stop));	// In ms
-    printf("GPU time: %f ms\n", elapsedTime);
+    
 
     CUDA_SAFE_CALL(cudaEventDestroy(start));
     CUDA_SAFE_CALL(cudaEventDestroy(stop));
@@ -93,6 +93,7 @@ int life0(){
     }
     
     printf("Red/Blue cells: %d/%d\n", red, blue);
+    printf("GPU time: %f ms\n", elapsedTime);
     
     free(domain_cpu);
     
@@ -123,7 +124,6 @@ int life1(){
     
     int cells_per_word = 1;
     int steps = 2;
-    
     
     
     // CUDA grid dimensions    
@@ -161,16 +161,18 @@ int life1(){
     CUDA_SAFE_CALL(cudaEventCreate(&start));
     CUDA_SAFE_CALL(cudaEventCreate(&stop));
 
-    // Start timer
-    CUDA_SAFE_CALL(cudaEventRecord(start, 0));
 
     // Kernel execution
     
     int shared_mem_size = thr_x * (thr_y + 2) * sizeof(int) ;
     printf("Shared mem size: %d bytes\n", shared_mem_size);
     
+    // Start timer
+    CUDA_SAFE_CALL(cudaEventRecord(start, 0));
+    
+
     for(int i = 0; i < steps; i++) {
-       life_kernel1<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);
+        life_kernel1<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);        
     }
 
     // Stop timer
@@ -179,7 +181,7 @@ int life1(){
 
     float elapsedTime;
     CUDA_SAFE_CALL(cudaEventElapsedTime(&elapsedTime, start, stop));	// In ms
-    printf("GPU time: %f ms\n", elapsedTime);
+    
 
     CUDA_SAFE_CALL(cudaEventDestroy(start));
     CUDA_SAFE_CALL(cudaEventDestroy(stop));
@@ -211,7 +213,9 @@ int life1(){
     }
 
     printf("Red/Blue cells: %d/%d\n", red, blue);
-
+    printf("GPU time: %f ms\n", elapsedTime);
+    
+    
     free(domain_cpu);
 
     return 0;
@@ -227,17 +231,31 @@ int life1(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int main(int argc, char ** argv){   
     if(argc == 1){                
         printf("You need to specify the implementation number!");
         return 1;
-    }
-    
-    int implementation = atoi(argv[1]);        
-    
+    }    
+    int implementation = atoi(argv[1]);                
     switch(implementation){
         case 0: return life0();
-        case 1: return life1();
+        case 1: return life1();        
+
     }
     return 0;
 }
