@@ -5,19 +5,15 @@
 // Reads a cell at (x+dx, y+dy)
 __device__ int read_cell(int * source_domain, int x, int y, int dx, int dy, int domain_x, int domain_y, int pitch){
     
-    
     /* 
     int i = -1;
     printf("%d\n", i % 128);
     i = -2;
     printf("%d\n", i % 128);    
     return 0;
-    */
-    
-    
-    
-    x = (x + dx + domain_x) % domain_x;	// Wrap around
-    y = (y + dy + domain_y) % domain_y;
+    */    
+    x = (unsigned int)(x + dx) % domain_x;	// Wrap around
+    y = (unsigned int)(y + dy) % domain_y;
     return source_domain[y * (pitch / sizeof(int)) + x];
 }
 
@@ -25,8 +21,8 @@ __device__ int read_cell(int * source_domain, int x, int y, int dx, int dy, int 
 
 // Writes cell at (x+dx, y+dy)
 __device__ int write_cell(int * dest_domain, int x, int y, int dx, int dy, int domain_x, int domain_y, int pitch, int cell_value){
-    x = (x + dx + domain_x) % domain_x;	// Wrap around
-    y = (y + dy + domain_y) % domain_y;
+    x = (unsigned int)(x + dx) % domain_x;	// Wrap around
+    y = (unsigned int)(y + dy) % domain_y;
     dest_domain[y * (pitch / sizeof(int)) + x] = cell_value;
     return 0;
 }
@@ -38,26 +34,21 @@ __device__ int calc_color(int myself, int nb, int nr, int na){
     int color = myself;    
     int tot_neig = nb + nr;   
     
-    // Survival conditions
-    if(na == 1){
-        color = 0;
-    }
+    // Survival conditions    
+    if(na == 1)color = 0;
     
-    if(tot_neig > 3){
-        color = 0;
-    }
+    if(tot_neig > 3) color = 0;
     
-    if(tot_neig == 3){    
-        if(myself == 0){
-            if(tot_neig == 3){
-                if(nb >= 2){
-                    color = 2;
-                }
-                else{
-                    color = 1;
-                }
-            }
+    if((tot_neig == 3) && (myself == 0)){    
+        color = 1 << ((nb & 0x02) >> 1);
+        /*
+        if(nb >= 2){
+            color = 2;
         }
+        else{
+            color = 1;
+        }
+        */
     }
     return color;
 }
@@ -226,11 +217,13 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
 
             int neig_value = sha[sindex];            
             
+            
             // The central element is the cell itself
             if((x==0) && (y==0)){
                 myself = neig_value;
                 continue;            
             } 
+            
             
             nr += (neig_value & 1);
             nb += (neig_value & 1<<1);
@@ -260,12 +253,153 @@ __global__ void life_kernel1(int * source_domain, int * dest_domain, int domain_
     
 #endif                
     
-    
-    int color = calc_color(myself, nb, nr, na);
+    int color = calc_color(myself, nb, nr, na);    
     
     ty = blockIdx.y * blockDim.y + threadIdx.y;        
     
     write_cell(dest_domain, threadIdx.x, ty, 0, 0, domain_x, domain_y, pitch, color);
+}
+
+
+
+
+
+
+
+
+// KERNEL 2
+
+
+
+__global__ void init_kernel2(int * domain, int domain_x, int domain_y, int pitch){    
+    int ty = blockIdx.y * blockDim.y + threadIdx.y;    
+    for(int i=0; i<CELLS_PER_THREAD; i++){
+        int tx = threadIdx.x * CELLS_PER_THREAD + i;
+        int value = tx % 3;    
+        if(value != 2) value ^= 1 << 0;
+        write_cell(domain, tx, ty, 0 , 0 , domain_x, domain_y, pitch, value);                                
+    }      
+}
+
+
+
+
+// Compute kernel
+__global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_x, int domain_y, int pitch){
+    
+    extern __shared__ int sha[];
+    
+    int isha;            
+    int ty = blockIdx.y * blockDim.y + threadIdx.y;
+    int tx = threadIdx.x * CELLS_PER_THREAD;      
+    
+    int s_ty = ty % blockDim.y + 1;       
+    
+    isha = s_ty * blockDim.x * CELLS_PER_THREAD + tx; 
+    
+    for(int i=0; i<CELLS_PER_THREAD; i++){        
+        sha[isha + i] = read_cell(source_domain, tx, ty, i, 0, domain_x, domain_y, pitch);            
+        
+        if (s_ty == 1) {
+            sha[isha + i - blockDim.x * CELLS_PER_THREAD] = read_cell(source_domain, tx, ty, i, -1, domain_x, domain_y, pitch);
+        }
+        if (s_ty == 4) {
+            sha[isha + i + blockDim.x * CELLS_PER_THREAD] = read_cell(source_domain, tx, ty, i, 1, domain_x, domain_y, pitch);
+        }    
+
+    }
+
+    __syncthreads();        
+    
+            
+#if 0   
+    
+    // Debug copy from global to shared ...
+    if(blockIdx.y==0){    
+        if(threadIdx.x==0){    
+            if(threadIdx.y==0){    
+            
+                //printf("\n%d", blockDim.y);
+                //printf("\n%d\n", blockDim.x);
+
+                for(int j=0;j<blockDim.y+2;j++){
+                    for(int i=0;i<blockDim.x * CELLS_PER_THREAD;i++){        
+                        int value = sha[i + j * blockDim.x * CELLS_PER_THREAD];                        
+                        printf("%d", value % 10);
+                    }
+                    printf("\n");        
+                }
+
+                printf("\n");        
+                printf("\n");        
+            
+            }
+        }
+    }           
+    __syncthreads();        
+    
+#endif    
+
+
+
+     
+#if 1    
+    
+
+    
+    
+    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                   
+    
+    for(int c=0; c<CELLS_PER_THREAD; c++){        
+        
+        int nr = 0; // number of red
+        int nb = 0; // number of blue    
+        int na = 0; // number of adjacent neighbours
+        int myself;    
+        
+        
+        
+        for(int y = -1; y < 2; y++){            
+            for(int x = -1; x < 2; x++){               
+            
+                unsigned int s_tx = (tx + c + x) % (blockDim.x * CELLS_PER_THREAD);
+                
+                isha = (s_ty + 1) * (blockDim.x * CELLS_PER_THREAD) + s_tx;                 
+                
+                #if 0
+                if(blockIdx.y==0){    
+                    if(threadIdx.x==0){    
+                        if(threadIdx.y==0){    
+                            printf("\n\nsisha=%d" , isha);                            
+                        }
+                    }
+                }
+                #endif            
+
+                int neig_value = sha[isha];
+                
+
+                // The central element is the cell itself
+                if((x==0) && (y==0)){
+                    myself = neig_value;
+                    continue;            
+                } 
+
+                nr += (neig_value & 1);
+                nb += (neig_value & 1<<1);
+                na += (!(x&y)) & neig_value;
+
+            }        
+        }
+        
+        int color = calc_color(myself, nb, nr, na);        
+        write_cell(dest_domain, tx, ty+1, c, 0, domain_x, domain_y, pitch, color);
+
+        
+    }
+    
+#endif                
+    
 }
 
 

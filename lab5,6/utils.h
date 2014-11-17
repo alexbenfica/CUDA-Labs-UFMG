@@ -1,6 +1,8 @@
 // Fonctions auxiliaires
 #include <stdio.h>
 
+const int CELLS_PER_THREAD = 16;
+
 // Depuis le SDK Cuda
 #  define CUDA_SAFE_CALL_NO_SYNC( call) do {                                 \
     cudaError err = call;                                                    \
