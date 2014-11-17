@@ -295,17 +295,21 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
     
     int s_ty = ty % blockDim.y + 1;       
     
-    isha = s_ty * blockDim.x * CELLS_PER_THREAD + tx; 
+    isha = s_ty * domain_x + tx; 
     
     for(int i=0; i<CELLS_PER_THREAD; i++){        
-        sha[isha + i] = read_cell(source_domain, tx, ty, i, 0, domain_x, domain_y, pitch);            
+        
+        unsigned int isha_2 = isha + i;
+        
+        sha[isha_2] = read_cell(source_domain, tx, ty, i, 0, domain_x, domain_y, pitch);            
         
         if (s_ty == 1) {
-            sha[isha + i - blockDim.x * CELLS_PER_THREAD] = read_cell(source_domain, tx, ty, i, -1, domain_x, domain_y, pitch);
+            sha[isha_2 - domain_x] = read_cell(source_domain, tx, ty, i, -1, domain_x, domain_y, pitch);
         }
         if (s_ty == 4) {
-            sha[isha + i + blockDim.x * CELLS_PER_THREAD] = read_cell(source_domain, tx, ty, i, 1, domain_x, domain_y, pitch);
+            sha[isha_2 + domain_x] = read_cell(source_domain, tx, ty, i, 1, domain_x, domain_y, pitch);
         }    
+
 
     }
 
@@ -348,23 +352,22 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
     
     
-    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                   
-    
-    for(int c=0; c<CELLS_PER_THREAD; c++){        
+    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                       
+    s_ty += 1;
+    s_ty %= domain_x;
+            
+    for(unsigned c=0; c<CELLS_PER_THREAD; c++){        
         
         int nr = 0; // number of red
         int nb = 0; // number of blue    
         int na = 0; // number of adjacent neighbours
         int myself;    
         
-        
-        
-        for(int y = -1; y < 2; y++){            
-            for(int x = -1; x < 2; x++){               
+        for(int x = -1; x < 2; x++){               
             
-                unsigned int s_tx = (tx + c + x) % (blockDim.x * CELLS_PER_THREAD);
-                
-                isha = (s_ty + 1) * (blockDim.x * CELLS_PER_THREAD) + s_tx;                 
+            isha = (((unsigned)tx + c + x) % domain_x);                 
+            
+            for(int y = -1; y < 2; y++){            
                 
                 #if 0
                 if(blockIdx.y==0){    
@@ -376,7 +379,7 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
                 }
                 #endif            
 
-                int neig_value = sha[isha];
+                unsigned int neig_value = sha[isha];
                 
 
                 // The central element is the cell itself
@@ -390,12 +393,9 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
                 na += (!(x&y)) & neig_value;
 
             }        
-        }
-        
+        }        
         int color = calc_color(myself, nb, nr, na);        
         write_cell(dest_domain, tx, ty+1, c, 0, domain_x, domain_y, pitch, color);
-
-        
     }
     
 #endif                
