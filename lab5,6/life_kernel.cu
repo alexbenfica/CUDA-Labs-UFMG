@@ -409,3 +409,148 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
 
 
+
+
+
+
+// KERNEL 3
+
+
+
+__global__ void init_kernel3(int * domain, int domain_x, int domain_y, int pitch){    
+    int ty = blockIdx.y * blockDim.y + threadIdx.y;    
+    for(int i=0; i<CELLS_PER_THREAD; i++){
+        int tx = threadIdx.x * CELLS_PER_THREAD + i;
+        int value = tx % 3;    
+        if(value != 2) value ^= 1 << 0;
+        write_cell(domain, tx, ty, 0 , 0 , domain_x, domain_y, pitch, value);                                
+    }      
+}
+
+
+
+
+// Compute kernel
+__global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_x, int domain_y, int pitch){
+    
+    extern __shared__ int sha[];
+    
+    int isha;            
+    int ty = blockIdx.y * blockDim.y + threadIdx.y;
+    int tx = threadIdx.x * CELLS_PER_THREAD;      
+    
+    int s_ty = ty % blockDim.y + 1;       
+    
+    isha = s_ty * domain_x + tx; 
+    
+    for(int i=0; i<CELLS_PER_THREAD; i++){        
+        
+        unsigned int isha_2 = isha + i;
+        
+        sha[isha_2] = read_cell(source_domain, tx, ty, i, 0, domain_x, domain_y, pitch);            
+        
+        if (s_ty == 1) {
+            sha[isha_2 - domain_x] = read_cell(source_domain, tx, ty, i, -1, domain_x, domain_y, pitch);
+        }
+        if (s_ty == 4) {
+            sha[isha_2 + domain_x] = read_cell(source_domain, tx, ty, i, 1, domain_x, domain_y, pitch);
+        }    
+
+
+    }
+
+    __syncthreads();        
+    
+            
+#if 0   
+    
+    // Debug copy from global to shared ...
+    if(blockIdx.y==0){    
+        if(threadIdx.x==0){    
+            if(threadIdx.y==0){    
+            
+                //printf("\n%d", blockDim.y);
+                //printf("\n%d\n", blockDim.x);
+
+                for(int j=0;j<blockDim.y+2;j++){
+                    for(int i=0;i<blockDim.x * CELLS_PER_THREAD;i++){        
+                        int value = sha[i + j * blockDim.x * CELLS_PER_THREAD];                        
+                        printf("%d", value % 10);
+                    }
+                    printf("\n");        
+                }
+
+                printf("\n");        
+                printf("\n");        
+            
+            }
+        }
+    }           
+    __syncthreads();        
+    
+#endif    
+
+
+
+     
+#if 1    
+    
+
+    
+    
+    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                       
+    s_ty += 1;
+    s_ty %= domain_x;
+            
+    for(unsigned c=0; c<CELLS_PER_THREAD; c++){        
+        
+        int nr = 0; // number of red
+        int nb = 0; // number of blue    
+        int na = 0; // number of adjacent neighbours
+        int myself;    
+        
+        for(int x = -1; x < 2; x++){               
+            
+            isha = (((unsigned)tx + c + x) % domain_x);                 
+            
+            for(int y = -1; y < 2; y++){            
+                
+                #if 0
+                if(blockIdx.y==0){    
+                    if(threadIdx.x==0){    
+                        if(threadIdx.y==0){    
+                            printf("\n\nsisha=%d" , isha);                            
+                        }
+                    }
+                }
+                #endif            
+
+                unsigned int neig_value = sha[isha];
+                
+
+                // The central element is the cell itself
+                if((x==0) && (y==0)){
+                    myself = neig_value;
+                    continue;            
+                } 
+
+                nr += (neig_value & 1);
+                nb += (neig_value & 1<<1);
+                na += (!(x&y)) & neig_value;
+
+            }        
+        }        
+        int color = calc_color(myself, nb, nr, na);        
+        write_cell(dest_domain, tx, ty+1, c, 0, domain_x, domain_y, pitch, color);
+    }
+    
+#endif                
+    
+}
+
+
+
+
+
+
+
