@@ -371,7 +371,7 @@ int life3(){
     
     // Total of 128 x 128 cells = 16384 cells
     
-    int cells_per_word = 1;
+    int cells_per_word = 16;
     int steps = 2;
     
     
@@ -412,15 +412,17 @@ int life3(){
 
     // Kernel execution
     
-    int shared_mem_size = thr_x * CELLS_PER_THREAD * (thr_y + 2) * sizeof(int) ;
+    int shared_mem_size = thr_x * CELLS_PER_THREAD * (thr_y + 2) * sizeof(int) / cells_per_word;
     printf("Shared mem size: %d bytes\n", shared_mem_size);
+    
+    
     
     // Start timer
     CUDA_SAFE_CALL(cudaEventRecord(start, 0));
     
 
     for(int i = 0; i < steps; i++) {
-        life_kernel3<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);        
+        //life_kernel3<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);        
     }
 
     // Stop timer
@@ -446,16 +448,24 @@ int life3(){
     int red = 0;
     int blue = 0;
     for(int y = 0; y < domain_y; y++){
-        for(int x = 0; x < domain_x; x++){
-            int cell = domain_cpu[y * pitch/sizeof(int) + x];
-            if(cell < 0) cell = 9;
-            printf("%u", cell % 10);
-            if(cell == 1) {
-                red++;
+        for(int x = 0; x < domain_x / cells_per_word; x++){
+            unsigned cells = (domain_cpu[y * pitch/sizeof(int) + x]);
+            
+            for(int c=0; c < cells_per_word; c++){
+                
+                unsigned cell = (cells >> (30 - c*2)) & 0x03;
+
+                printf("%u", cell % 10);
+                if(cell == 1) {
+                    red++;
+                }
+                else if(cell == 2) {
+                    blue++;
+                }                
             }
-            else if(cell == 2) {
-                blue++;
-            }
+            //printf(" ");
+
+            
         }
         printf("\n");
     }

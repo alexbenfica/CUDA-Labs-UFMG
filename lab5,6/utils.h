@@ -3,6 +3,18 @@
 
 const int CELLS_PER_THREAD = 16;
 
+
+/* 
+ * 102 102 102 102 102 1 
+ * 010010 010010 010010 010010 010010 01
+ * 0100 1001 0010 0100 1001 0010 0100 1001
+ * 0x49249249
+ 
+*/
+
+const int CELL_INIT_PATTERN = 0x49249249;
+
+
 // Depuis le SDK Cuda
 #  define CUDA_SAFE_CALL_NO_SYNC( call) do {                                 \
     cudaError err = call;                                                    \

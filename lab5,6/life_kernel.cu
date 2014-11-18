@@ -418,13 +418,10 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
 
 __global__ void init_kernel3(int * domain, int domain_x, int domain_y, int pitch){    
-    int ty = blockIdx.y * blockDim.y + threadIdx.y;    
-    for(int i=0; i<CELLS_PER_THREAD; i++){
-        int tx = threadIdx.x * CELLS_PER_THREAD + i;
-        int value = tx % 3;    
-        if(value != 2) value ^= 1 << 0;
-        write_cell(domain, tx, ty, 0 , 0 , domain_x, domain_y, pitch, value);                                
-    }      
+    int ty = blockIdx.y * blockDim.y + threadIdx.y;            
+    unsigned shift = (threadIdx.x % 3) << 1;    
+    unsigned value = (CELL_INIT_PATTERN << shift) | (CELL_INIT_PATTERN >> ((6 - shift)));        
+    write_cell(domain, threadIdx.x, ty, 0 , 0 , domain_x, domain_y, pitch, value);                                
 }
 
 
