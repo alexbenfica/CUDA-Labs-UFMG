@@ -29,9 +29,9 @@ __device__ int write_cell(int * dest_domain, int x, int y, int dx, int dy, int d
 
 
 
-__device__ int calc_color(int myself, int nb, int nr, int na){
+__device__ unsigned calc_color(unsigned myself, unsigned nb, unsigned nr, unsigned na){
     
-    int color = myself;    
+    unsigned color = myself;    
     int tot_neig = nb + nr;   
     
     // Survival conditions    
@@ -394,7 +394,7 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
             }        
         }        
-        int color = calc_color(myself, nb, nr, na);        
+        int color = calc_color(myself, nb, nr, na);                
         write_cell(dest_domain, tx, ty+1, c, 0, domain_x, domain_y, pitch, color);
     }
     
@@ -448,11 +448,19 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
     if (s_ty == 4) {
         sha[isha + blockDim.x] = read_cell(source_domain, tx, ty, 0, 1, domain_x, domain_y, pitch);
     }    
+    
+    
+    
 __syncthreads();        
     
             
-#if 1
-    
+#if 0
+
+
+    // #copies cells to destination domain.
+    write_cell(dest_domain, tx, ty, 0, 0, domain_x, domain_y, pitch, 1 );
+
+
     // Debug copy from global to shared ...
     if(blockIdx.y==0){    
         if(threadIdx.x==0){    
@@ -460,6 +468,8 @@ __syncthreads();
             
                 //printf("\n%d", blockDim.y);
                 //printf("\n%d\n", blockDim.x);
+                
+                printf("\n");        
 
                 for(int j=0;j<blockDim.y+2;j++){
                     for(int i=0;i<blockDim.x;i++){        
@@ -480,61 +490,125 @@ __syncthreads();
     }           
     __syncthreads();        
     
+    return;
+    
 #endif    
 
 
-
+    
      
 #if 1    
     
+    
 
+
+    unsigned mycells = 0xFFFFFFFF;
     
-    
-    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                       
-    s_ty += 1;
-    s_ty %= blockDim.x;
-    
-    for(unsigned c=0; c<CELLS_PER_THREAD; c++){        
+    for(unsigned c=0; c < CELLS_PER_THREAD; c++){        
         
         int nr = 0; // number of red
         int nb = 0; // number of blue    
         int na = 0; // number of adjacent neighbours
-        int myself;    
+        unsigned myself;    
+        unsigned myshift;
         
-        for(int x = -1; x < 2; x++){               
+        
+        for(int y = -1; y < 2; y++){            
             
-            isha = (((unsigned)tx + c + x) % blockDim.x);                 
+            s_ty = (ty + y + 1) % blockDim.y;
             
-            for(int y = -1; y < 2; y++){            
+            for(int x = -1; x < 2; x++){               
+                
+                unsigned s_tx = (threadIdx.x * CELLS_PER_THREAD + x + c + blockDim.x * CELLS_PER_THREAD);
+                
+                s_tx %= blockDim.x * CELLS_PER_THREAD;
+                
+                unsigned int shift = (30 - (s_tx % CELLS_PER_THREAD) * 2);
+                
+                s_tx /= CELLS_PER_THREAD;
+
+                isha = s_ty * blockDim.x + s_tx;
+                
+                unsigned int cells = sha[isha];
+                
+                /*  
+                 *      0x00000000
+                 *      0b 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+                 * c       0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15
+                 *   
+                 * 
+                 * 
+                 * 
+                 * 
+                 * 
+                 */
+                
+                // Extract the desired cell from 32 bits elements...!
+                //unsigned int shift = ((15 - (c+x)) * 2) % 32;
+                unsigned int neig = (cells >> shift) & 0x03;
                 
                 #if 0
                 if(blockIdx.y==0){    
                     if(threadIdx.x==0){    
                         if(threadIdx.y==0){    
-                            printf("\n\nsisha=%d" , isha);                            
+                            printf("\nc=%3d"
+                                    "\tx=%3d"
+                                    "\ty=%3d"
+                                    "\ts_tx=%3d"
+                                    "\ts_ty=%3d"
+                                    "\tisha=%4d"
+                                    "\tshift=%2d"                                    
+                                    "\tcells=0x%08x"                                    
+                                    "\tneigh=%1d"                                    
+                                    "" , c, x, y, s_tx, s_ty, isha,  shift, cells, neig);                            
                         }
                     }
                 }
                 #endif            
 
-                unsigned int neig_value = sha[isha];
-                
 
                 // The central element is the cell itself
                 if((x==0) && (y==0)){
-                    myself = neig_value;
+                    myself = neig;                    
+                    myshift = shift;
+                    if(mycells == 0xFFFFFFFF){                        
+                        mycells = cells;
+                    }                    
                     continue;            
                 } 
 
-                nr += (neig_value & 1);
-                nb += (neig_value & 1<<1);
-                na += (!(x&y)) & neig_value;
-
+                nr += (neig & 1);
+                nb += (neig & 1<<1);
+                na += (~(x&y)) & neig;
             }        
         }        
-        int color = calc_color(myself, nb, nr, na);        
-        write_cell(dest_domain, tx, ty+1, c, 0, domain_x, domain_y, pitch, color);
+        
+        
+        unsigned color = calc_color(myself, nb, nr, na);        
+        
+        mycells = ( ~(0x03 << myshift) & mycells ) | ( color << myshift );
+        
+        #if 0
+        if(blockIdx.y==0){    
+            if(threadIdx.x==0){    
+                if(threadIdx.y==0){    
+                    printf("\nnr=%d"
+                            "\tnb=%d"
+                            "\tna=%d"
+                            "\tcolor=%d"
+                            "\tmyshift=%d"
+                            "\tmyself=0x%8x"
+                            "\tmycells=0x%8x"
+                            "" , nr, nb, na, color, myshift, myself, mycells);                            
+                }
+            }
+        }
+        #endif            
+        
     }
+    
+    write_cell(dest_domain, tx, ty, 0, 0, domain_x, domain_y, pitch, mycells);
+    
     
 #endif                
     

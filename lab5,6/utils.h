@@ -3,6 +3,8 @@
 
 const int CELLS_PER_THREAD = 16;
 
+const int CELLS_PER_WORD = 16;
+
 
 /* 
  * 102 102 102 102 102 1 

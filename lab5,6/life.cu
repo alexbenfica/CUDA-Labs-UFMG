@@ -371,7 +371,7 @@ int life3(){
     
     // Total of 128 x 128 cells = 16384 cells
     
-    int cells_per_word = 16;
+    
     int steps = 2;
     
     
@@ -396,8 +396,8 @@ int life3(){
     int * domain_gpu[2] = {NULL, NULL};
 
     size_t pitch;
-    CUDA_SAFE_CALL(cudaMallocPitch((void**)&domain_gpu[0], &pitch, domain_x / cells_per_word * sizeof(int), domain_y));
-    CUDA_SAFE_CALL(cudaMallocPitch((void**)&domain_gpu[1], &pitch, domain_x / cells_per_word * sizeof(int), domain_y));
+    CUDA_SAFE_CALL(cudaMallocPitch((void**)&domain_gpu[0], &pitch, domain_x / CELLS_PER_WORD * sizeof(int), domain_y));
+    CUDA_SAFE_CALL(cudaMallocPitch((void**)&domain_gpu[1], &pitch, domain_x / CELLS_PER_WORD * sizeof(int), domain_y));
 
     //printf("%d", pitch);
     
@@ -412,7 +412,7 @@ int life3(){
 
     // Kernel execution
     
-    int shared_mem_size = thr_x * CELLS_PER_THREAD * (thr_y + 2) * sizeof(int) / cells_per_word;
+    int shared_mem_size = thr_x * CELLS_PER_THREAD * (thr_y + 2) * sizeof(int) / CELLS_PER_WORD;
     printf("Shared mem size: %d bytes\n", shared_mem_size);
     
     
@@ -447,11 +447,12 @@ int life3(){
     // Count colors
     int red = 0;
     int blue = 0;
+    printf("\n");
     for(int y = 0; y < domain_y; y++){
-        for(int x = 0; x < domain_x / cells_per_word; x++){
+        for(int x = 0; x < domain_x / CELLS_PER_WORD; x++){
             unsigned cells = (domain_cpu[y * pitch/sizeof(int) + x]);
             
-            for(int c=0; c < cells_per_word; c++){
+            for(int c=0; c < CELLS_PER_WORD; c++){
                 
                 unsigned cell = (cells >> (30 - c*2)) & 0x03;
 
