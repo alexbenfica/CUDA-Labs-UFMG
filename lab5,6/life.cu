@@ -422,7 +422,7 @@ int life3(){
     
 
     for(int i = 0; i < steps; i++) {
-        //life_kernel3<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);        
+        life_kernel3<<< grid, threads, shared_mem_size >>>(domain_gpu[i%2], domain_gpu[(i+1)%2], domain_x, domain_y, pitch);        
     }
 
     // Stop timer

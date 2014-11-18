@@ -352,9 +352,6 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
     
     
-    s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                       
-    s_ty += 1;
-    s_ty %= domain_x;
             
     for(unsigned c=0; c<CELLS_PER_THREAD; c++){        
         
@@ -363,11 +360,14 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
         int na = 0; // number of adjacent neighbours
         int myself;    
         
-        for(int x = -1; x < 2; x++){               
+        for(int y = -1; y < 2; y++){            
             
-            isha = (((unsigned)tx + c + x) % domain_x);                 
+            s_ty = (blockIdx.y * blockDim.y + threadIdx.y + y + 1) %  blockDim.y;                       
+            s_ty *= domain_x;
             
-            for(int y = -1; y < 2; y++){            
+            for(int x = -1; x < 2; x++){               
+                
+                isha = (((unsigned)tx + c + x) % domain_x + s_ty);                 
                 
                 #if 0
                 if(blockIdx.y==0){    
@@ -434,32 +434,24 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
     
     int isha;            
     int ty = blockIdx.y * blockDim.y + threadIdx.y;
-    int tx = threadIdx.x * CELLS_PER_THREAD;      
+    int tx = threadIdx.x;      
     
     int s_ty = ty % blockDim.y + 1;       
     
-    isha = s_ty * domain_x + tx; 
-    
-    for(int i=0; i<CELLS_PER_THREAD; i++){        
-        
-        unsigned int isha_2 = isha + i;
-        
-        sha[isha_2] = read_cell(source_domain, tx, ty, i, 0, domain_x, domain_y, pitch);            
-        
-        if (s_ty == 1) {
-            sha[isha_2 - domain_x] = read_cell(source_domain, tx, ty, i, -1, domain_x, domain_y, pitch);
-        }
-        if (s_ty == 4) {
-            sha[isha_2 + domain_x] = read_cell(source_domain, tx, ty, i, 1, domain_x, domain_y, pitch);
-        }    
+    isha = s_ty * blockDim.x + tx; 
 
+    sha[isha] = read_cell(source_domain, tx, ty, 0, 0, domain_x, domain_y, pitch);            
 
+    if (s_ty == 1) {
+        sha[isha - blockDim.x] = read_cell(source_domain, tx, ty, 0, -1, domain_x, domain_y, pitch);
     }
-
-    __syncthreads();        
+    if (s_ty == 4) {
+        sha[isha + blockDim.x] = read_cell(source_domain, tx, ty, 0, 1, domain_x, domain_y, pitch);
+    }    
+__syncthreads();        
     
             
-#if 0   
+#if 1
     
     // Debug copy from global to shared ...
     if(blockIdx.y==0){    
@@ -470,9 +462,12 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
                 //printf("\n%d\n", blockDim.x);
 
                 for(int j=0;j<blockDim.y+2;j++){
-                    for(int i=0;i<blockDim.x * CELLS_PER_THREAD;i++){        
-                        int value = sha[i + j * blockDim.x * CELLS_PER_THREAD];                        
-                        printf("%d", value % 10);
+                    for(int i=0;i<blockDim.x;i++){        
+                        unsigned cells = sha[i + j * blockDim.x];                        
+                        for(int c=0;c<CELLS_PER_THREAD;c++){                            
+                            unsigned cell = (cells >> (30 - c*2)) & 0x03;
+                            printf("%d", cell % 10);
+                        }
                     }
                     printf("\n");        
                 }
@@ -497,8 +492,8 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
     
     s_ty = (blockIdx.y * blockDim.y + threadIdx.y) %  blockDim.y + 1;                       
     s_ty += 1;
-    s_ty %= domain_x;
-            
+    s_ty %= blockDim.x;
+    
     for(unsigned c=0; c<CELLS_PER_THREAD; c++){        
         
         int nr = 0; // number of red
@@ -508,7 +503,7 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
         
         for(int x = -1; x < 2; x++){               
             
-            isha = (((unsigned)tx + c + x) % domain_x);                 
+            isha = (((unsigned)tx + c + x) % blockDim.x);                 
             
             for(int y = -1; y < 2; y++){            
                 
