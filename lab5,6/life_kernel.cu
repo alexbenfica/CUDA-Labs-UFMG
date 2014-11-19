@@ -313,7 +313,10 @@ __global__ void life_kernel2(int * source_domain, int * dest_domain, int domain_
 
     }
 
+    //return;
+    
     __syncthreads();        
+
     
             
 #if 0   
@@ -432,13 +435,12 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
     
     extern __shared__ int sha[];
     
-    int isha;            
     int ty = blockIdx.y * blockDim.y + threadIdx.y;
     int tx = threadIdx.x;      
     
     int s_ty = ty % blockDim.y + 1;       
     
-    isha = s_ty * blockDim.x + tx; 
+    int isha = s_ty * blockDim.x + tx; 
 
     sha[isha] = read_cell(source_domain, tx, ty, 0, 0, domain_x, domain_y, pitch);            
 
@@ -449,14 +451,10 @@ __global__ void life_kernel3(int * source_domain, int * dest_domain, int domain_
         sha[isha + blockDim.x] = read_cell(source_domain, tx, ty, 0, 1, domain_x, domain_y, pitch);
     }    
     
-    
-    
-__syncthreads();        
-    
+    //return;
+    __syncthreads();        
             
 #if 0
-
-
     // #copies cells to destination domain.
     write_cell(dest_domain, tx, ty, 0, 0, domain_x, domain_y, pitch, 1 );
 
@@ -494,40 +492,40 @@ __syncthreads();
     
 #endif    
 
-
+    
     
      
 #if 1    
     
-    
-
-
-    unsigned mycells = 0xFFFFFFFF;
+    unsigned mycells;
     
     for(unsigned c=0; c < CELLS_PER_THREAD; c++){        
         
-        int nr = 0; // number of red
-        int nb = 0; // number of blue    
-        int na = 0; // number of adjacent neighbours
+        unsigned nr = 0; // number of red
+        unsigned nb = 0; // number of blue    
+        unsigned na = 0; // number of adjacent neighbours
         unsigned myself;    
         unsigned myshift;
-        
         
         for(int y = -1; y < 2; y++){            
             
             s_ty = (ty + y + 1) % blockDim.y;
             
+            unsigned s_tx = (threadIdx.x * CELLS_PER_THREAD + c + blockDim.x * CELLS_PER_THREAD);
+            
             for(int x = -1; x < 2; x++){               
                 
-                unsigned s_tx = (threadIdx.x * CELLS_PER_THREAD + x + c + blockDim.x * CELLS_PER_THREAD);
+                unsigned s_tx2 = s_tx + x;
                 
-                s_tx %= blockDim.x * CELLS_PER_THREAD;
+                // Optimized by the compiler as << 4 ?
+                s_tx2 %= blockDim.x * CELLS_PER_THREAD;
                 
-                unsigned int shift = (30 - (s_tx % CELLS_PER_THREAD) * 2);
+                unsigned int shift = (30 - (s_tx2 % CELLS_PER_THREAD) * 2);
                 
-                s_tx /= CELLS_PER_THREAD;
+                // Optimized by the compiler as >> 4 ?
+                s_tx2 /= CELLS_PER_THREAD;
 
-                isha = s_ty * blockDim.x + s_tx;
+                isha = s_ty * blockDim.x + s_tx2;
                 
                 unsigned int cells = sha[isha];
                 
@@ -571,9 +569,8 @@ __syncthreads();
                 if((x==0) && (y==0)){
                     myself = neig;                    
                     myshift = shift;
-                    if(mycells == 0xFFFFFFFF){                        
-                        mycells = cells;
-                    }                    
+                    // Initializes when looping on the first cell on each thread.
+                    if(!c)mycells = cells;                                   
                     continue;            
                 } 
 
